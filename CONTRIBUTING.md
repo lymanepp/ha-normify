@@ -44,7 +44,7 @@ People *love* thorough bug reports. I'm not even kidding.
 
 ## Use a Consistent Coding Style
 
-Use [black](https://github.com/ambv/black) to make sure the code follows the style.
+Use Ruff for linting and formatting. Run `ruff check .` and `ruff format --check .` before submitting changes.
 
 ## Test your code modification
 

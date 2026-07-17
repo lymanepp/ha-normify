@@ -1,79 +1,99 @@
 # Normify
 
-Normify converts raw Home Assistant sensor values into normalized values suitable
-for downstream automations. This first conversion pass preserves the existing
-`ha-calibration` polynomial-calibration behavior while replacing the legacy
-platform/discovery architecture with config entries, a UI config flow,
-reconfiguration support, diagnostics, and independently testable calibration
-logic.
+Normify converts a raw Home Assistant sensor value into one dependable canonical
+sensor without requiring a chain of Template, Compensation, Filter, and throttle
+helpers.
 
-Normify remains directly descended from Home Assistant Core's
-[Compensation](https://www.home-assistant.io/integrations/compensation/)
-integration. Additional conditioning stages are intentionally **not** included
-in this pass.
+Normify is the successor to `ha-calibration` and retains its polynomial
+calibration lineage from Home Assistant Core's Compensation integration.
 
-## Changes from ha-calibration
+## Deliberately simple pipeline
 
-- Repository renamed from `ha-calibration` to `ha-normify`.
-- Integration domain changed from `calibration` to `normify`.
-- YAML definitions are imported into reloadable config entries.
-- New UI setup and reconfigure flows.
-- Calibration fitting and evaluation moved to a pure, testable module.
-- Explicit rejection of `NaN`, positive infinity, and negative infinity.
-- Source metadata inheritance no longer disappears when later updates omit it.
-- Unit, config-flow, YAML-import, and entity tests added.
-- Modern HACS metadata, translations, diagnostics, Ruff, mypy, pytest, coverage,
-  and GitHub Actions configuration.
+```text
+Source state or attribute
+  → reject unknown, unavailable, missing, nonnumeric, NaN, and infinite values
+  → clamp to an optional physical range
+  → optional polynomial calibration, scale, and offset
+  → optional single smoothing method
+  → precision, minimum-change deadband, and time throttling
+  → canonical Home Assistant sensor
+```
+
+Normify inherits the source unit, device class, state class, and icon whenever
+Home Assistant exposes them. Overrides remain available for unusual sources, but
+normal sensor configurations should not repeat metadata.
+
+## YAML example
+
+```yaml
+normify:
+  guest_bathroom_humidity:
+    source: sensor.guest_bathroom_humidity_raw
+    hide_source: true
+
+    clamp:
+      minimum: 0
+      maximum: 100
+
+    calibration:
+      data_points:
+        - [38.68, 32.0]
+        - [79.89, 75.0]
+      degree: 1
+
+    smoothing:
+      method: median
+      window: 3
+
+    publish:
+      minimum_change: 0.2
+      minimum_interval: 10
+      maximum_interval: 300
+
+    precision: 1
+    stale_after: 900
+```
+
+Time values in YAML are seconds. The UI uses Home Assistant duration selectors.
+
+## Behavior
+
+- `unknown`, `unavailable`, missing attributes, nonnumeric values, `NaN`, and
+  infinity are automatically ignored.
+- Invalid samples never enter calibration or smoothing history.
+- `clamp.minimum` and `clamp.maximum` constrain the raw numeric value rather
+  than rejecting it.
+- Only one smoothing method can be active: `median`, `moving_average`, or
+  `exponential`.
+- `minimum_change` suppresses insignificant canonical updates.
+- `minimum_interval` limits publication frequency.
+- `maximum_interval` releases the newest held value after the configured time.
+- `stale_after` marks the canonical entity unavailable after no valid numeric
+  source sample for the configured time.
+
+## Metadata inheritance
+
+For source-state conditioning, Normify inherits when available:
+
+- Unit of measurement
+- Device class
+- State class
+- Icon
+
+The UI also derives the output name from the source friendly name and removes a
+trailing `Raw`, `Unfiltered`, `Uncalibrated`, or `Source` suffix. A name override
+is optional.
+
+## Backward compatibility
+
+Existing flat calibration-only YAML and existing v0.3 config entries continue to
+load. New configurations should use the concise nested form above.
 
 ## Installation
 
 Install as a custom HACS repository or copy `custom_components/normify` into the
-Home Assistant configuration directory, then restart Home Assistant.
-
-## YAML migration
-
-Change the top-level domain from `calibration` to `normify`:
-
-```yaml
-normify:
-  garage_humidity:
-    source: sensor.garage_humidity_uncalibrated
-    degree: 1
-    hide_source: true
-    data_points:
-      - [38.68, 32.0]
-      - [79.89, 75.0]
-```
-
-On startup, each YAML object is imported as a Normify config entry. The object ID
-becomes the stable config-entry unique ID and the default display name. YAML
-remains the source of truth for imported entries: changing it and restarting
-updates the existing entry rather than creating a duplicate.
-
-Do not keep the old `calibration:` section active after installing Normify.
-
-## UI configuration
-
-Add **Normify** from **Settings → Devices & services → Add integration**. Enter
-calibration points as one `raw, normalized` pair per line:
-
-```text
-38.68, 32
-79.89, 75
-```
-
-Existing UI entries can be edited through **Reconfigure**.
-
-## Behavior retained in this pass
-
-- Polynomial degree 1 through 7.
-- Source entity state or one source attribute.
-- Configurable precision and metadata.
-- Optional source hiding.
-- Last valid output is retained when the source becomes `unknown`,
-  `unavailable`, or omits the configured attribute.
-- A nonnumeric or non-finite source value changes the Normify entity to
-  `unknown` and logs a warning.
+Home Assistant configuration directory, restart Home Assistant, and add
+**Normify** from **Settings → Devices & services → Add integration**.
 
 ## Development
 
@@ -85,10 +105,4 @@ ruff check .
 ruff format --check .
 mypy custom_components/normify
 pytest --cov
-```
-
-The pure calibration tests can be run without Home Assistant integration setup:
-
-```bash
-pytest tests/components/normify/test_calibration.py
 ```

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-import math
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any, cast
 
 from homeassistant.components.sensor import (
@@ -35,19 +36,25 @@ from homeassistant.core import (
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.entity_registry import RegistryEntryHider
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
+from homeassistant.util import dt as dt_util
 
-from .calibration import InvalidSourceValueError, PolynomialCalibration
+from .config import pipeline_config_from_data
 from .const import (
+    ATTR_ACCEPTED_SAMPLES,
     ATTR_COEFFICIENTS,
+    ATTR_CONDITIONED_VALUE,
+    ATTR_HELD_SAMPLES,
+    ATTR_LAST_REJECTION,
+    ATTR_PUBLISHED_SAMPLES,
+    ATTR_REJECTED_SAMPLES,
     ATTR_SOURCE,
     ATTR_SOURCE_ATTRIBUTE,
     ATTR_SOURCE_VALUE,
-    CONF_DATA_POINTS,
-    CONF_DEGREE,
     CONF_HIDE_SOURCE,
-    CONF_PRECISION,
+    DOMAIN,
 )
+from .pipeline import ConditioningPipeline, Disposition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,25 +65,26 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up a Normify sensor from a config entry."""
-    async_add_entities([NormifySensor(hass, entry)])
+    sensor = NormifySensor(hass, entry)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = sensor
+    async_add_entities([sensor])
 
 
 class NormifySensor(SensorEntity):
-    """A calibrated sensor backed by one source state or attribute."""
+    """One canonical sensor backed by an in-memory conditioning pipeline."""
 
     _attr_should_poll = False
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the Normify sensor."""
         config = entry.data
+        self._entry_id = entry.entry_id
         self._source_entity_id = config[CONF_SOURCE]
         self._source_attribute = config.get(CONF_ATTRIBUTE)
-        self._calibration = PolynomialCalibration.fit(
-            config[CONF_DATA_POINTS],
-            degree=config[CONF_DEGREE],
-            precision=config[CONF_PRECISION],
-        )
+        self._pipeline = ConditioningPipeline(pipeline_config_from_data(config))
         self._source_value: float | None = None
+        self._conditioned_value: float | None = None
+        self._cancel_timer: Callable[[], None] | None = None
 
         self._attr_unique_id = f"normify.{entry.unique_id or entry.entry_id}"
         self._attr_name = config[CONF_NAME]
@@ -88,6 +96,7 @@ class NormifySensor(SensorEntity):
             SensorStateClass | None, config.get("state_class")
         )
         self._attr_icon = None
+        self._attr_available = False
 
         if config.get(CONF_HIDE_SOURCE):
             registry = er.async_get(hass)
@@ -100,15 +109,30 @@ class NormifySensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return stable calibration diagnostics."""
+        """Return compact pipeline diagnostics with the canonical state."""
+        snapshot = self._pipeline.snapshot()
+        stats = snapshot.stats
         attributes: dict[str, Any] = {
             ATTR_SOURCE: self._source_entity_id,
             ATTR_SOURCE_VALUE: self._source_value,
-            ATTR_COEFFICIENTS: list(self._calibration.coefficients),
+            ATTR_CONDITIONED_VALUE: self._conditioned_value,
+            ATTR_ACCEPTED_SAMPLES: stats["accepted"],
+            ATTR_REJECTED_SAMPLES: stats["rejected"],
+            ATTR_HELD_SAMPLES: stats["held"],
+            ATTR_PUBLISHED_SAMPLES: stats["published"],
         }
+        if self._pipeline.coefficients:
+            attributes[ATTR_COEFFICIENTS] = list(self._pipeline.coefficients)
+        if self._pipeline.last_rejection_reason:
+            attributes[ATTR_LAST_REJECTION] = self._pipeline.last_rejection_reason
         if self._source_attribute:
             attributes[ATTR_SOURCE_ATTRIBUTE] = self._source_attribute
         return attributes
+
+    @property
+    def pipeline(self) -> ConditioningPipeline:
+        """Expose the pure pipeline for integration diagnostics."""
+        return self._pipeline
 
     async def async_added_to_hass(self) -> None:
         """Prime the sensor and subscribe to source state changes."""
@@ -122,52 +146,128 @@ class NormifySensor(SensorEntity):
                 self._async_source_state_listener,
             )
         )
+        self._schedule_timer()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Cancel timers and remove runtime diagnostics reference."""
+        if self._cancel_timer is not None:
+            self._cancel_timer()
+            self._cancel_timer = None
+        self.hass.data.get(DOMAIN, {}).pop(self._entry_id, None)
+        await super().async_will_remove_from_hass()
 
     @callback
     def _async_source_state_listener(self, event: Event[EventStateChangedData]) -> None:
         """Handle source entity state changes."""
-        if (new_state := event.data["new_state"]) is None:
+        new_state = event.data["new_state"]
+        if new_state is None:
+            self._handle_source_unavailable()
             return
         self._process_source_state(new_state)
 
     @callback
     def _process_source_state(self, state: State, *, write_state: bool = True) -> None:
-        """Extract, calibrate, and publish one source state."""
+        """Extract and condition one source state."""
         if state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            self._handle_source_unavailable(write_state=write_state)
             return
 
         if self._source_attribute:
             raw_value = state.attributes.get(self._source_attribute)
             if raw_value is None:
+                self._handle_source_unavailable(write_state=write_state)
                 return
         else:
             raw_value = state.state
             self._inherit_source_metadata(state)
 
-        try:
-            source_value = float(raw_value)
-            if not math.isfinite(source_value):
-                raise InvalidSourceValueError("source value must be finite")
-            native_value = self._calibration.apply(source_value)
-        except (InvalidSourceValueError, TypeError, ValueError):
-            self._source_value = None
-            self._attr_native_value = None
-            if self._source_attribute:
-                _LOGGER.warning(
-                    "%s attribute %s is not a finite numeric value",
-                    self._source_entity_id,
-                    self._source_attribute,
-                )
-            else:
-                _LOGGER.warning(
-                    "%s state is not a finite numeric value", self._source_entity_id
-                )
+        was_available = self.available
+        result = self._pipeline.process(raw_value, state.last_updated)
+        self._source_value = result.raw_value
+        self._conditioned_value = result.conditioned_value
+
+        if result.disposition is Disposition.PUBLISH:
+            self._attr_native_value = result.value
+            self._attr_available = True
+            if write_state:
+                self.async_write_ha_state()
+        elif result.disposition is Disposition.HOLD:
+            self._attr_available = self._attr_native_value is not None
+            if write_state and not was_available and self.available:
+                self.async_write_ha_state()
         else:
-            self._source_value = source_value
-            self._attr_native_value = native_value
+            _LOGGER.debug(
+                "Normify rejected %s from %s: %s",
+                raw_value,
+                self._source_entity_id,
+                result.reason,
+            )
+            if self._attr_native_value is None:
+                self._attr_available = False
+                if write_state and was_available != self.available:
+                    self.async_write_ha_state()
+
+        self._schedule_timer(result.next_wakeup)
+
+    @callback
+    def _handle_source_unavailable(self, *, write_state: bool = True) -> None:
+        """Retain the last value until the configured stale timeout expires."""
+        was_available = self.available
+        if self._attr_native_value is None:
+            self._attr_available = False
+        elif self._pipeline.is_stale(dt_util.utcnow()):
+            self._attr_available = False
+        if write_state and was_available != self.available:
+            self.async_write_ha_state()
+        self._schedule_timer()
+
+    @callback
+    def _async_timer(self, now: datetime) -> None:
+        """Flush pending publication and enforce stale timeout."""
+        self._cancel_timer = None
+        was_available = self.available
+        result = self._pipeline.flush(now)
+        write_state = False
+
+        if result.disposition is Disposition.PUBLISH:
+            self._attr_native_value = result.value
+            self._conditioned_value = result.conditioned_value
+            self._attr_available = True
+            write_state = True
+
+        if self._pipeline.is_stale(now):
+            self._attr_available = False
+            if was_available:
+                write_state = True
 
         if write_state:
             self.async_write_ha_state()
+        self._schedule_timer(result.next_wakeup)
+
+    @callback
+    def _schedule_timer(self, next_wakeup: datetime | None = None) -> None:
+        """Schedule the earliest publication or staleness deadline."""
+        if self._cancel_timer is not None:
+            self._cancel_timer()
+            self._cancel_timer = None
+
+        now = dt_util.utcnow()
+        stale_deadline = self._pipeline.stale_deadline() if self.available else None
+        deadlines = [
+            deadline
+            for deadline in (
+                next_wakeup,
+                self._pipeline.next_wakeup(now),
+                stale_deadline,
+            )
+            if deadline is not None
+        ]
+        if not deadlines:
+            return
+
+        deadline = min(deadlines)
+        delay = max((deadline - now).total_seconds(), 0)
+        self._cancel_timer = async_call_later(self.hass, delay, self._async_timer)
 
     @callback
     def _inherit_source_metadata(self, state: State) -> None:

@@ -4,53 +4,111 @@
     "step": {
       "user": {
         "title": "Create a Normified sensor",
-        "description": "Create a calibrated sensor from another sensor's state or attribute.",
+        "description": "Choose the source. Normify inherits unit, device class, state class, and icon whenever the source provides them.",
         "data": {
-          "name": "Name",
           "source": "Source sensor",
+          "name": "Name override",
           "attribute": "Source attribute",
-          "data_points_text": "Calibration points",
-          "degree": "Polynomial degree",
-          "precision": "Precision",
-          "unit_of_measurement": "Unit of measurement",
-          "device_class": "Device class",
-          "state_class": "State class",
           "hide_source": "Hide source entity"
         },
         "data_description": {
-          "attribute": "Leave blank to use the source entity state.",
-          "data_points_text": "Enter one input, output pair per line.",
-          "hide_source": "Cannot be used when reading a source attribute."
+          "name": "Leave blank to derive the name from the source.",
+          "attribute": "Leave blank to condition the source state.",
+          "hide_source": "Cannot be used when conditioning an attribute."
+        }
+      },
+      "conditioning": {
+        "title": "Condition the value",
+        "description": "Clamp the physical range, optionally calibrate, and select at most one smoothing method.",
+        "data": {
+          "minimum": "Clamp minimum",
+          "maximum": "Clamp maximum",
+          "data_points_text": "Calibration points",
+          "degree": "Polynomial degree",
+          "scale": "Scale multiplier",
+          "offset": "Offset",
+          "method": "Smoothing method",
+          "window": "Smoothing window",
+          "alpha": "Exponential alpha"
+        },
+        "data_description": {
+          "minimum": "Values below this boundary are clamped to it.",
+          "maximum": "Values above this boundary are clamped to it.",
+          "data_points_text": "Optional raw, corrected pairs, one per line.",
+          "window": "Used by median and moving-average smoothing.",
+          "alpha": "Used only by exponential smoothing."
+        }
+      },
+      "publication": {
+        "title": "Control publication",
+        "description": "Round values, suppress insignificant changes, limit update frequency, and detect stale sources.",
+        "data": {
+          "precision": "Decimal precision",
+          "minimum_change": "Minimum change",
+          "minimum_interval": "Minimum publication interval",
+          "maximum_interval": "Maximum publication interval",
+          "stale_after": "Unavailable after no valid sample"
+        },
+        "data_description": {
+          "minimum_interval": "Zero disables time throttling.",
+          "maximum_interval": "Zero disables forced publication of a held value.",
+          "stale_after": "Zero retains the last valid value indefinitely."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure Normified sensor",
-        "description": "Update the source, calibration, metadata, or precision.",
+        "title": "Reconfigure source",
+        "description": "Update the source and optional name override.",
         "data": {
-          "name": "Name",
           "source": "Source sensor",
+          "name": "Name override",
           "attribute": "Source attribute",
+          "hide_source": "Hide source entity"
+        }
+      },
+      "reconfigure_conditioning": {
+        "title": "Reconfigure conditioning",
+        "description": "Update clamping, calibration, and the single smoothing method.",
+        "data": {
+          "minimum": "Clamp minimum",
+          "maximum": "Clamp maximum",
           "data_points_text": "Calibration points",
           "degree": "Polynomial degree",
-          "precision": "Precision",
-          "unit_of_measurement": "Unit of measurement",
-          "device_class": "Device class",
-          "state_class": "State class",
-          "hide_source": "Hide source entity"
-        },
-        "data_description": {
-          "attribute": "Leave blank to use the source entity state.",
-          "data_points_text": "Enter one input, output pair per line.",
-          "hide_source": "Cannot be used when reading a source attribute."
+          "scale": "Scale multiplier",
+          "offset": "Offset",
+          "method": "Smoothing method",
+          "window": "Smoothing window",
+          "alpha": "Exponential alpha"
+        }
+      },
+      "reconfigure_publication": {
+        "title": "Reconfigure publication",
+        "description": "Update precision, deadband, throttling, heartbeat, and staleness.",
+        "data": {
+          "precision": "Decimal precision",
+          "minimum_change": "Minimum change",
+          "minimum_interval": "Minimum publication interval",
+          "maximum_interval": "Maximum publication interval",
+          "stale_after": "Unavailable after no valid sample"
         }
       }
     },
     "error": {
-      "invalid_calibration": "The calibration configuration is invalid. Check the point format, polynomial degree, and distinct input values."
+      "invalid_configuration": "The conditioning configuration is invalid."
     },
     "abort": {
       "already_configured": "This Normify helper is already configured.",
+      "invalid_import": "The YAML conditioning configuration is invalid.",
       "reconfigure_successful": "The Normify helper was reconfigured successfully."
+    }
+  },
+  "selector": {
+    "smoothing_method": {
+      "options": {
+        "none": "None",
+        "median": "Median",
+        "moving_average": "Moving average",
+        "exponential": "Exponential"
+      }
     }
   }
 }

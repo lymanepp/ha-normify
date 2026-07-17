@@ -151,10 +151,14 @@ class PolynomialCalibration:
             _polynomial=polynomial,
         )
 
-    def apply(self, source_value: object) -> float:
-        """Transform one source value and round it to configured precision."""
+    def evaluate(self, source_value: object) -> float:
+        """Transform one source value without applying output rounding."""
         numeric_value = _finite_float(source_value, description="source value")
         result = float(self._polynomial(numeric_value))
         if not math.isfinite(result):
             raise InvalidSourceValueError("calibrated value must be finite")
-        return round(result, self.precision)
+        return result
+
+    def apply(self, source_value: object) -> float:
+        """Transform one source value and round it to configured precision."""
+        return round(self.evaluate(source_value), self.precision)
