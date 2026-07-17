@@ -11,7 +11,7 @@ jobs:
   hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Keep the official HACS validator visible, but do not let its current
       # manifest-parsing regression fail an otherwise valid repository.
