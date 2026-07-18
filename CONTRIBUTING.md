@@ -67,5 +67,11 @@ This repository follows `ludeeus/integration_blueprint`. Rebuild/open the reposi
 scripts/develop
 ```
 
-The template intentionally does not define a project-specific F5 launch configuration. Home Assistant is started through `scripts/develop`, as prescribed by the template.
+Run repository checks separately with:
+
+```bash
+scripts/check
+```
+
+The template intentionally does not define a project-specific F5 launch configuration.
 

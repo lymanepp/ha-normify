@@ -12,16 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # Keep the official HACS validator visible, but do not let its current
-      # manifest-parsing regression fail an otherwise valid repository.
-      - name: Official HACS validation
-        continue-on-error: true
+      - name: HACS validation
         uses: hacs/action@main
         with:
           category: integration
           ignore: brands
-
-      # Deterministically validate the repository files that HACS requires.
-      - name: Validate HACS repository metadata
-        run: python scripts/validate_hacs.py

@@ -20,7 +20,7 @@ The pipeline runs in this order:
 ```text
 Source state or attribute
   → reject unknown, unavailable, missing, nonnumeric, NaN, and infinity
-  → optional configured value rejection
+  → optional minimum/maximum rejection
   → optional calibration
   → optional fixed time window selecting mean or latest
   → optional rounding
@@ -34,7 +34,6 @@ Source state or attribute
 - Source sensor
 - Optional source attribute
 - Optional output-name override
-- Hide source entity
 
 Signal Conditioner inherits the unit, device class, state class, and icon whenever the
 source provides them.
@@ -43,7 +42,6 @@ source provides them.
 
 - Minimum valid value
 - Maximum valid value
-- Specific numeric values to reject
 
 ### Calibration
 
@@ -58,9 +56,9 @@ window:
   output: mean
 ```
 
-A configured window starts with the first accepted reading, collects every
-accepted calibrated reading during the period, and publishes exactly once when
-the period ends.
+A configured instance owns a repeating interval timer. It collects every accepted
+calibrated reading received during each interval and publishes exactly once at the
+interval boundary when at least one reading was collected. Empty intervals publish nothing.
 
 - `mean` publishes the arithmetic mean of all readings in the period and is the default when `output` is omitted.
 - `latest` publishes the final accepted reading in the period.
@@ -109,5 +107,5 @@ Home Assistant configuration directory, restart Home Assistant, and add
 ## Development
 
 ```bash
-scripts/develop
+scripts/check
 ```

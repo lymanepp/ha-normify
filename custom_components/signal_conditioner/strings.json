@@ -9,7 +9,6 @@
           "source": "Source sensor",
           "name": "Name override",
           "attribute": "Source attribute",
-          "hide_source": "Hide source entity",
           "enable_limits": "Apply custom value limits",
           "enable_calibration": "Calibrate values",
           "enable_rounding": "Round output values",
@@ -17,20 +16,21 @@
           "unit_of_measurement": "Unit of measurement override",
           "device_class": "Device class override",
           "state_class": "State class override",
-          "icon": "Icon override"
+          "icon": "Icon override",
+          "hide_source": "Hide source entity"
         },
         "data_description": {
           "name": "Leave blank to derive the name from the source.",
           "attribute": "Leave blank to condition the source state.",
-          "hide_source": "Cannot be used when conditioning an attribute.",
-          "enable_limits": "Configure minimum, maximum, or specific numeric values to reject.",
+          "enable_limits": "Configure an optional minimum and/or maximum valid value.",
           "enable_calibration": "Correct readings using raw and corrected value pairs.",
           "enable_rounding": "Round the final output to a chosen number of decimal places.",
           "enable_window": "Collect all accepted readings during one period and publish either their mean or the latest reading when it ends.",
           "unit_of_measurement": "Leave blank to inherit it from a state-based source. Attribute-based sources do not inherit metadata.",
           "device_class": "Leave blank to inherit it from a state-based source.",
           "state_class": "Leave blank to inherit it from a state-based source.",
-          "icon": "Leave blank to inherit it from a state-based source."
+          "icon": "Leave blank to inherit it from a state-based source.",
+          "hide_source": "Hide the source entity in Home Assistant after creating this conditioned sensor. Cannot be used when conditioning an attribute."
         }
       },
       "reconfigure": {
@@ -40,7 +40,6 @@
           "source": "Source sensor",
           "name": "Name override",
           "attribute": "Source attribute",
-          "hide_source": "Hide source entity",
           "enable_limits": "Apply custom value limits",
           "enable_calibration": "Calibrate values",
           "enable_rounding": "Round output values",
@@ -48,20 +47,21 @@
           "unit_of_measurement": "Unit of measurement override",
           "device_class": "Device class override",
           "state_class": "State class override",
-          "icon": "Icon override"
+          "icon": "Icon override",
+          "hide_source": "Hide source entity"
         },
         "data_description": {
           "name": "Leave blank to derive the name from the source.",
           "attribute": "Leave blank to condition the source state.",
-          "hide_source": "Cannot be used when conditioning an attribute.",
-          "enable_limits": "Configure minimum, maximum, or specific numeric values to reject.",
+          "enable_limits": "Configure an optional minimum and/or maximum valid value.",
           "enable_calibration": "Correct readings using raw and corrected value pairs.",
           "enable_rounding": "Round the final output to a chosen number of decimal places.",
           "enable_window": "Collect all accepted readings during one period and publish either their mean or the latest reading when it ends.",
           "unit_of_measurement": "Leave blank to inherit it from a state-based source. Attribute-based sources do not inherit metadata.",
           "device_class": "Leave blank to inherit it from a state-based source.",
           "state_class": "Leave blank to inherit it from a state-based source.",
-          "icon": "Leave blank to inherit it from a state-based source."
+          "icon": "Leave blank to inherit it from a state-based source.",
+          "hide_source": "Hide the source entity in Home Assistant after creating this conditioned sensor. Cannot be used when conditioning an attribute."
         }
       },
       "value_limits": {
@@ -69,13 +69,11 @@
         "description": "Only the rules entered here are added. Values outside the configured range are rejected.",
         "data": {
           "minimum": "Minimum valid value",
-          "maximum": "Maximum valid value",
-          "reject_values_text": "Specific values to reject"
+          "maximum": "Maximum valid value"
         },
         "data_description": {
           "minimum": "Leave blank for no lower limit.",
-          "maximum": "Leave blank for no upper limit.",
-          "reject_values_text": "Optional comma-separated values, such as -999, 9999."
+          "maximum": "Leave blank for no upper limit."
         }
       },
       "calibration": {
@@ -96,10 +94,6 @@
         "data": {
           "precision": "Decimal places"
         }
-      },
-      "review": {
-        "title": "Review pipeline",
-        "description": "{pipeline}"
       },
       "window": {
         "title": "Process readings in a time window",

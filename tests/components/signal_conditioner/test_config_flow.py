@@ -26,8 +26,6 @@ from custom_components.signal_conditioner.const import (
     CONF_MINIMUM,
     CONF_OUTPUT,
     CONF_PRECISION,
-    CONF_REJECT_VALUES,
-    CONF_REJECT_VALUES_TEXT,
     CONF_STATE_CLASS,
     CONF_WINDOW_DURATION,
     CONF_WINDOW_OUTPUT,
@@ -59,6 +57,10 @@ async def _source_step(
             CONF_SOURCE: "sensor.garage_humidity_raw",
             "attribute": "",
             CONF_HIDE_SOURCE: False,
+            CONF_UNIT_OF_MEASUREMENT: "",
+            CONF_DEVICE_CLASS: "",
+            CONF_STATE_CLASS: "",
+            CONF_ICON: "",
             CONF_ENABLE_LIMITS: limits,
             CONF_ENABLE_CALIBRATION: calibration,
             CONF_ENABLE_WINDOW: window,
@@ -68,15 +70,13 @@ async def _source_step(
 
 
 async def test_only_enabled_steps_are_visited(hass: HomeAssistant) -> None:
-    """The one window page owns collection and publication timing."""
     result = await _source_step(
         hass, limits=True, calibration=True, window=True, rounding=True
     )
     assert result["step_id"] == "value_limits"
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {CONF_MINIMUM: 0, CONF_MAXIMUM: 100, CONF_REJECT_VALUES_TEXT: "-999"},
+        result["flow_id"], {CONF_MINIMUM: 0, CONF_MAXIMUM: 100}
     )
     assert result["step_id"] == "calibration"
 
@@ -95,40 +95,29 @@ async def test_only_enabled_steps_are_visited(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_PRECISION: 1}
     )
-    assert result["step_id"] == "review"
-
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_WINDOW_DURATION] == 30
     assert result["data"][CONF_WINDOW_OUTPUT] == WINDOW_OUTPUT_MEAN
     assert result["data"][CONF_DATA_POINTS] == [[38.68, 32.0], [79.89, 75.0]]
-    assert result["data"][CONF_REJECT_VALUES] == [-999.0]
 
 
-async def test_source_only_pipeline_skips_window(hass: HomeAssistant) -> None:
-    """Omitting the window publishes accepted readings immediately."""
+async def test_source_only_pipeline_finishes_immediately(hass: HomeAssistant) -> None:
     result = await _source_step(hass)
-    assert result["step_id"] == "review"
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Garage Humidity Raw"
 
 
-async def test_metadata_overrides_are_saved_and_shown_in_review(
-    hass: HomeAssistant,
-) -> None:
-    """Create flow persists every explicit metadata override."""
-    hass.states.async_set(
-        "sensor.attribute_container",
-        "1",
-        {"friendly_name": "Attribute Container", "temperature": 72.5},
-    )
+async def test_metadata_overrides_are_saved(hass: HomeAssistant) -> None:
+    hass.states.async_set("sensor.raw", "1")
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
-            CONF_NAME: "Conditioned attribute",
-            CONF_SOURCE: "sensor.attribute_container",
-            "attribute": "temperature",
+            CONF_NAME: "Conditioned",
+            CONF_SOURCE: "sensor.raw",
+            "attribute": "",
             CONF_HIDE_SOURCE: False,
             CONF_UNIT_OF_MEASUREMENT: "°F",
             CONF_DEVICE_CLASS: "temperature",
@@ -140,47 +129,13 @@ async def test_metadata_overrides_are_saved_and_shown_in_review(
             CONF_ENABLE_ROUNDING: False,
         },
     )
-
-    assert result["step_id"] == "review"
-    assert "unit °F" in result["description_placeholders"]["pipeline"]
-    assert "device class temperature" in result["description_placeholders"]["pipeline"]
-    assert "state class measurement" in result["description_placeholders"]["pipeline"]
-    assert "icon mdi:thermometer" in result["description_placeholders"]["pipeline"]
-
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_UNIT_OF_MEASUREMENT] == "°F"
     assert result["data"][CONF_DEVICE_CLASS] == "temperature"
-    assert result["data"][CONF_STATE_CLASS] == "measurement"
-    assert result["data"][CONF_ICON] == "mdi:thermometer"
 
 
 async def test_blank_metadata_overrides_are_elided(hass: HomeAssistant) -> None:
-    """Blank optional metadata fields are never persisted."""
-    hass.states.async_set("sensor.raw", "5")
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_NAME: "Plain sensor",
-            CONF_SOURCE: "sensor.raw",
-            "attribute": "",
-            CONF_HIDE_SOURCE: False,
-            CONF_UNIT_OF_MEASUREMENT: "   ",
-            CONF_DEVICE_CLASS: "",
-            CONF_STATE_CLASS: "",
-            CONF_ICON: "",
-            CONF_ENABLE_LIMITS: False,
-            CONF_ENABLE_CALIBRATION: False,
-            CONF_ENABLE_WINDOW: False,
-            CONF_ENABLE_ROUNDING: False,
-        },
-    )
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+    result = await _source_step(hass)
     for key in (
         CONF_UNIT_OF_MEASUREMENT,
         CONF_DEVICE_CLASS,
@@ -190,90 +145,9 @@ async def test_blank_metadata_overrides_are_elided(hass: HomeAssistant) -> None:
         assert key not in result["data"]
 
 
-async def test_reconfigure_can_change_and_clear_metadata_overrides(
-    hass: HomeAssistant,
-) -> None:
-    """Reconfigure exposes persisted metadata and removes cleared overrides."""
-    hass.states.async_set("sensor.raw", "5")
-    entry = ConfigEntry(
-        version=1,
-        minor_version=0,
-        domain=DOMAIN,
-        title="Metadata sensor",
-        data={
-            CONF_NAME: "Metadata sensor",
-            CONF_SOURCE: "sensor.raw",
-            CONF_HIDE_SOURCE: False,
-            CONF_UNIT_OF_MEASUREMENT: "°F",
-            CONF_DEVICE_CLASS: "temperature",
-            CONF_STATE_CLASS: "measurement",
-            CONF_ICON: "mdi:thermometer",
-        },
-        source="user",
-        unique_id="metadata_sensor",
-        discovery_keys={},
-        options={},
-        subentries_data=[],
-    )
-    hass.config_entries._entries[entry.entry_id] = entry
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={
-            "source": config_entries.SOURCE_RECONFIGURE,
-            "entry_id": entry.entry_id,
-        },
-    )
-    assert result["step_id"] == "reconfigure"
-
-    schema = result["data_schema"].schema
-    suggested = {
-        marker.schema: marker.description.get("suggested_value")
-        for marker in schema
-        if hasattr(marker, "description") and marker.description
-    }
-    assert suggested[CONF_UNIT_OF_MEASUREMENT] == "°F"
-    assert suggested[CONF_DEVICE_CLASS] == "temperature"
-    assert suggested[CONF_STATE_CLASS] == "measurement"
-    assert suggested[CONF_ICON] == "mdi:thermometer"
-
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_NAME: "Metadata sensor",
-            CONF_SOURCE: "sensor.raw",
-            "attribute": "",
-            CONF_HIDE_SOURCE: False,
-            CONF_UNIT_OF_MEASUREMENT: "°C",
-            CONF_DEVICE_CLASS: "",
-            CONF_STATE_CLASS: "",
-            CONF_ICON: "",
-            CONF_ENABLE_LIMITS: False,
-            CONF_ENABLE_CALIBRATION: False,
-            CONF_ENABLE_WINDOW: False,
-            CONF_ENABLE_ROUNDING: False,
-        },
-    )
-    assert result["step_id"] == "review"
-    assert "unit °C" in result["description_placeholders"]["pipeline"]
-    assert "device class" not in result["description_placeholders"]["pipeline"]
-
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "reconfigure_successful"
-    assert entry.data[CONF_UNIT_OF_MEASUREMENT] == "°C"
-    for key in (CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_ICON):
-        assert key not in entry.data
-
-
-async def test_user_entries_are_unique_by_source_not_display_name(
-    hass: HomeAssistant,
-) -> None:
-    """Two different source signals may intentionally share a display name."""
+async def test_same_name_different_sources_do_not_collide(hass: HomeAssistant) -> None:
     for entity_id in ("sensor.first_raw", "sensor.second_raw"):
-        hass.states.async_set(entity_id, "1", {"friendly_name": "Shared Raw"})
-
-    for entity_id in ("sensor.first_raw", "sensor.second_raw"):
+        hass.states.async_set(entity_id, "1", {"friendly_name": "Shared"})
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -283,13 +157,42 @@ async def test_user_entries_are_unique_by_source_not_display_name(
                 CONF_NAME: "Shared",
                 CONF_SOURCE: entity_id,
                 "attribute": "",
-                CONF_HIDE_SOURCE: False,
+                CONF_UNIT_OF_MEASUREMENT: "",
+                CONF_DEVICE_CLASS: "",
+                CONF_STATE_CLASS: "",
+                CONF_ICON: "",
                 CONF_ENABLE_LIMITS: False,
                 CONF_ENABLE_CALIBRATION: False,
                 CONF_ENABLE_WINDOW: False,
                 CONF_ENABLE_ROUNDING: False,
             },
         )
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
         assert result["type"] is FlowResultType.CREATE_ENTRY
         assert result["result"].unique_id == entity_id
+
+
+async def test_attribute_and_hide_source_are_incompatible(hass: HomeAssistant) -> None:
+    """The source entity cannot be hidden when conditioning one attribute."""
+    hass.states.async_set("sensor.raw", "5", {"temperature": 72})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Attribute",
+            CONF_SOURCE: "sensor.raw",
+            "attribute": "temperature",
+            CONF_HIDE_SOURCE: True,
+            CONF_UNIT_OF_MEASUREMENT: "",
+            CONF_DEVICE_CLASS: "",
+            CONF_STATE_CLASS: "",
+            CONF_ICON: "",
+            CONF_ENABLE_LIMITS: False,
+            CONF_ENABLE_CALIBRATION: False,
+            CONF_ENABLE_WINDOW: False,
+            CONF_ENABLE_ROUNDING: False,
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_configuration"}

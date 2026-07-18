@@ -31,7 +31,6 @@ from .const import (
     CONF_MINIMUM,
     CONF_OUTPUT,
     CONF_PRECISION,
-    CONF_REJECT_VALUES,
     CONF_ROUNDING,
     CONF_STATE_CLASS,
     CONF_VALUE_LIMITS,
@@ -52,12 +51,11 @@ def _validate_signal_conditioner(value: dict[str, Any]) -> dict[str, Any]:
     """Validate and flatten one concise conditioning configuration."""
     if value.get(CONF_ATTRIBUTE) and value.get(CONF_HIDE_SOURCE):
         raise vol.Invalid("attribute and hide_source cannot be used together")
-    flat = flatten_configuration(value)
     try:
-        pipeline_config_from_data(flat)
+        pipeline_config_from_data(value)
     except PipelineConfigurationError as err:
         raise vol.Invalid(str(err)) from err
-    return flat
+    return flatten_configuration(value)
 
 
 _positive_window = vol.All(
@@ -68,7 +66,6 @@ VALUE_LIMITS_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_MINIMUM): vol.Coerce(float),
         vol.Optional(CONF_MAXIMUM): vol.Coerce(float),
-        vol.Optional(CONF_REJECT_VALUES): [vol.Coerce(float)],
     }
 )
 CALIBRATION_SCHEMA = vol.Schema(

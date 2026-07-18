@@ -1,12 +1,9 @@
 """Unit tests for the pure Signal Conditioner calibration engine."""
 
-import math
-
 import pytest
 
 from custom_components.signal_conditioner.calibration import (
-    InvalidDataPointsError,
-    InvalidSourceValueError,
+    CalibrationError,
     PolynomialCalibration,
     format_data_points_text,
     normalize_data_points,
@@ -50,31 +47,14 @@ def test_quadratic_calibration_with_repeated_samples() -> None:
 
 def test_requires_degree_plus_one_points() -> None:
     """A polynomial requires at least degree + 1 points."""
-    with pytest.raises(InvalidDataPointsError, match="at least 3 points"):
+    with pytest.raises(CalibrationError, match="at least 3 points"):
         PolynomialCalibration.fit([[1, 2], [2, 3]], degree=2)
 
 
 def test_requires_degree_plus_one_distinct_inputs() -> None:
     """Duplicate x values cannot independently define a polynomial."""
-    with pytest.raises(InvalidDataPointsError, match="3 distinct input values"):
+    with pytest.raises(CalibrationError, match="3 distinct input values"):
         PolynomialCalibration.fit([[1, 2], [1, 3], [2, 4]], degree=2)
-
-
-@pytest.mark.parametrize("bad_value", ["nan", "inf", "-inf", math.nan, math.inf])
-def test_rejects_non_finite_source_values(bad_value: object) -> None:
-    """NaN and infinity must never become an HA sensor state."""
-    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1)
-
-    with pytest.raises(InvalidSourceValueError, match="finite"):
-        calibration.evaluate(bad_value)
-
-
-def test_rejects_non_numeric_source_value() -> None:
-    """Reject non-numeric source input cleanly."""
-    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1)
-
-    with pytest.raises(InvalidSourceValueError, match="not numeric"):
-        calibration.evaluate("garbage")
 
 
 def test_data_points_text_round_trip() -> None:
@@ -87,11 +67,11 @@ def test_data_points_text_round_trip() -> None:
 
 def test_rejects_malformed_data_point_text() -> None:
     """Each line must contain exactly one pair."""
-    with pytest.raises(InvalidDataPointsError, match="line 2"):
+    with pytest.raises(CalibrationError, match="line 2"):
         parse_data_points_text("0, 0\n1, 1, 2")
 
 
 def test_normalize_rejects_non_finite_points() -> None:
     """Fitted points must be finite."""
-    with pytest.raises(InvalidDataPointsError, match="must be finite"):
+    with pytest.raises(CalibrationError, match="must be finite"):
         normalize_data_points([[0, 0], [1, "nan"]])

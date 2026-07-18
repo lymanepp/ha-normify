@@ -1,6 +1,4 @@
-"""Unit tests for the pure Signal Conditioner conditioning pipeline."""
-
-from datetime import UTC, datetime, timedelta
+"""Unit tests for the pure Signal Conditioner pipeline."""
 
 import pytest
 
@@ -14,148 +12,78 @@ from custom_components.signal_conditioner.pipeline import (
     WindowOutput,
 )
 
-NOW = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
 
-
-def test_rejects_sentinels_and_out_of_range_values() -> None:
-    """Configured garbage and impossible values are rejected."""
-    pipeline = ConditioningPipeline(
-        PipelineConfig(reject_values=(-999.0,), minimum=0, maximum=100)
-    )
-
-    assert pipeline.process(-999, NOW).disposition is Disposition.REJECT
-    assert pipeline.process(-1, NOW).reason == "below_minimum"
-    assert pipeline.process(101, NOW).reason == "above_maximum"
-    assert pipeline.stats.rejected == 3
+def test_rejects_out_of_range_values() -> None:
+    pipeline = ConditioningPipeline(PipelineConfig(minimum=0, maximum=100))
+    assert pipeline.process(-1).reason == "below minimum"
+    assert pipeline.process(101).reason == "above maximum"
 
 
 def test_applies_calibration_before_rounding() -> None:
-    """Calibration runs before optional final rounding."""
     calibration = PolynomialCalibration.fit([[0, 0], [10, 20]], degree=1)
     pipeline = ConditioningPipeline(
         PipelineConfig(calibration=calibration, precision=2)
     )
-
-    result = pipeline.process(3.333, NOW)
-
-    assert result.value == 6.67
+    assert pipeline.process(3.333).value == 6.67
 
 
-def test_mean_window_collects_every_value_and_publishes_once() -> None:
-    """One timer closes the period and publishes the mean of all readings."""
-    pipeline = ConditioningPipeline(
-        PipelineConfig(
-            window_duration=10,
-            window_output=WindowOutput.MEAN,
-            precision=2,
-        )
-    )
-
-    first = pipeline.process(1, NOW)
-    second = pipeline.process(3, NOW + timedelta(seconds=2))
-    third = pipeline.process(8, NOW + timedelta(seconds=9))
-
-    assert first.disposition is Disposition.HOLD
-    assert second.disposition is Disposition.HOLD
-    assert third.disposition is Disposition.HOLD
-    assert first.next_wakeup == NOW + timedelta(seconds=10)
-    assert pipeline.flush(NOW + timedelta(seconds=9)).disposition is Disposition.HOLD
-
-    result = pipeline.flush(NOW + timedelta(seconds=10))
-    assert result.disposition is Disposition.PUBLISH
-    assert result.value == 4.0
-    assert pipeline.next_wakeup() is None
-
-
-def test_latest_window_uses_the_same_timer_and_shape() -> None:
-    """Latest differs only in the value selected at the shared boundary."""
-    pipeline = ConditioningPipeline(
-        PipelineConfig(window_duration=10, window_output=WindowOutput.LATEST)
-    )
-
-    pipeline.process(1, NOW)
-    pipeline.process(3, NOW + timedelta(seconds=2))
-    pipeline.process(8, NOW + timedelta(seconds=9))
-
-    result = pipeline.flush(NOW + timedelta(seconds=10))
-    assert result.disposition is Disposition.PUBLISH
-    assert result.value == 8
-
-
-def test_rejected_values_never_enter_the_window() -> None:
-    """Value rejection and calibration occur before collection."""
-    pipeline = ConditioningPipeline(
-        PipelineConfig(
-            minimum=0,
-            maximum=100,
-            window_duration=10,
-            window_output=WindowOutput.MEAN,
-        )
-    )
-
-    pipeline.process(10, NOW)
-    assert (
-        pipeline.process(200, NOW + timedelta(seconds=2)).disposition
-        is Disposition.REJECT
-    )
-    pipeline.process(20, NOW + timedelta(seconds=4))
-
-    assert pipeline.flush(NOW + timedelta(seconds=10)).value == 15
-
-
-def test_next_window_starts_with_the_next_accepted_reading() -> None:
-    """A completed window is cleared and does not reuse prior readings."""
+def test_mean_interval_uses_every_accepted_value() -> None:
     pipeline = ConditioningPipeline(
         PipelineConfig(window_duration=10, window_output=WindowOutput.MEAN)
     )
+    assert pipeline.process(1).disposition is Disposition.HOLD
+    assert pipeline.process(3).disposition is Disposition.HOLD
+    assert pipeline.process(8).disposition is Disposition.HOLD
+    result = pipeline.flush()
+    assert result.disposition is Disposition.PUBLISH
+    assert result.value == 4
 
-    pipeline.process(10, NOW)
-    assert pipeline.flush(NOW + timedelta(seconds=10)).value == 10
 
-    next_reading = pipeline.process(20, NOW + timedelta(seconds=25))
-    assert next_reading.next_wakeup == NOW + timedelta(seconds=35)
-    assert pipeline.flush(NOW + timedelta(seconds=35)).value == 20
+def test_latest_interval_uses_same_pipeline_shape() -> None:
+    pipeline = ConditioningPipeline(
+        PipelineConfig(window_duration=10, window_output=WindowOutput.LATEST)
+    )
+    pipeline.process(1)
+    pipeline.process(3)
+    pipeline.process(8)
+    assert pipeline.flush().value == 8
+
+
+def test_empty_interval_does_not_publish() -> None:
+    pipeline = ConditioningPipeline(PipelineConfig(window_duration=10))
+    assert pipeline.flush().disposition is Disposition.HOLD
+
+
+def test_rejected_values_never_enter_interval() -> None:
+    pipeline = ConditioningPipeline(
+        PipelineConfig(minimum=0, maximum=100, window_duration=10)
+    )
+    pipeline.process(10)
+    assert pipeline.process(200).disposition is Disposition.REJECT
+    pipeline.process(20)
+    assert pipeline.flush().value == 15
 
 
 @pytest.mark.parametrize("bad_value", ["garbage", "nan", "inf", None])
-def test_rejects_nonfinite_source_values(bad_value: object) -> None:
-    """Invalid source values never escape the pure pipeline."""
-    pipeline = ConditioningPipeline(PipelineConfig())
-
-    result = pipeline.process(bad_value, NOW)
-
+def test_rejects_invalid_source_values(bad_value: object) -> None:
+    result = ConditioningPipeline(PipelineConfig()).process(bad_value)
     assert result.disposition is Disposition.REJECT
     assert result.reason is not None
 
 
-def test_default_pipeline_is_immediate_unmodified_pass_through() -> None:
-    """Omitting every optional behavior still publishes a sane value."""
-    pipeline = ConditioningPipeline(PipelineConfig())
-
-    result = pipeline.process(12.345, NOW)
-
+def test_default_pipeline_is_immediate_pass_through() -> None:
+    result = ConditioningPipeline(PipelineConfig()).process(12.345)
     assert result.disposition is Disposition.PUBLISH
     assert result.value == 12.345
 
 
 def test_default_window_output_is_mean() -> None:
-    """A duration without an explicit output mode selects mean."""
     pipeline = ConditioningPipeline(PipelineConfig(window_duration=10))
-    pipeline.process(2, NOW)
-    pipeline.process(4, NOW + timedelta(seconds=5))
-
-    assert pipeline.flush(NOW + timedelta(seconds=10)).value == 3
-
-
-def test_reject_values_allow_only_float_representation_noise() -> None:
-    """Sentinel matching tolerates tiny conversion noise without becoming broad."""
-    pipeline = ConditioningPipeline(PipelineConfig(reject_values=(12.3456789,)))
-
-    assert pipeline.process(12.3456789005, NOW).disposition is Disposition.REJECT
-    assert pipeline.process(12.34568, NOW).disposition is Disposition.PUBLISH
+    pipeline.process(2)
+    pipeline.process(4)
+    assert pipeline.flush().value == 3
 
 
 def test_pipeline_config_enforces_maximum_window_duration() -> None:
-    """The pure pipeline enforces the same maximum as YAML and the UI."""
-    with pytest.raises(PipelineConfigurationError, match="cannot exceed"):
+    with pytest.raises(PipelineConfigurationError, match="between 0"):
         PipelineConfig(window_duration=MAX_WINDOW_SECONDS + 1)

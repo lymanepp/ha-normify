@@ -11,10 +11,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 
 from custom_components.signal_conditioner.const import (
-    ATTR_SOURCE_VALUE,
     CONF_DATA_POINTS,
     CONF_DEGREE,
-    CONF_HIDE_SOURCE,
     CONF_PRECISION,
     DOMAIN,
 )
@@ -43,7 +41,6 @@ async def test_sensor_updates_and_inherits_metadata(hass: HomeAssistant) -> None
             CONF_DATA_POINTS: [[1.0, 2.0], [2.0, 3.0]],
             CONF_DEGREE: 1,
             CONF_PRECISION: 2,
-            CONF_HIDE_SOURCE: False,
         },
         source="user",
         unique_id="corrected_temperature",
@@ -61,7 +58,6 @@ async def test_sensor_updates_and_inherits_metadata(hass: HomeAssistant) -> None
     assert float(state.state) == 5.0
     assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == "°C"
     assert state.attributes[ATTR_DEVICE_CLASS] == "temperature"
-    assert state.attributes[ATTR_SOURCE_VALUE] == 4.0
 
     hass.states.async_set("sensor.raw_temperature", "7", {})
     await hass.async_block_till_done()
@@ -87,7 +83,6 @@ async def test_unavailable_source_retains_last_valid_value(hass: HomeAssistant) 
             CONF_DATA_POINTS: [[0.0, 0.0], [1.0, 1.0]],
             CONF_DEGREE: 1,
             CONF_PRECISION: 2,
-            CONF_HIDE_SOURCE: False,
         },
         source="user",
         unique_id="stable_value",

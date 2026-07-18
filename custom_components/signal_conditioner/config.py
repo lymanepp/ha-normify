@@ -14,7 +14,6 @@ from .const import (
     CONF_MINIMUM,
     CONF_OUTPUT,
     CONF_PRECISION,
-    CONF_REJECT_VALUES,
     CONF_ROUNDING,
     CONF_VALUE_LIMITS,
     CONF_WINDOW,
@@ -33,7 +32,7 @@ def flatten_configuration(data: Mapping[str, Any]) -> dict[str, Any]:
 
     value_limits = flat.pop(CONF_VALUE_LIMITS, None)
     if isinstance(value_limits, Mapping):
-        for key in (CONF_MINIMUM, CONF_MAXIMUM, CONF_REJECT_VALUES):
+        for key in (CONF_MINIMUM, CONF_MAXIMUM):
             if key in value_limits:
                 flat[key] = value_limits[key]
 
@@ -64,7 +63,6 @@ def pipeline_config_from_data(data: Mapping[str, Any]) -> PipelineConfig:
         degree=int(flat.get(CONF_DEGREE, DEFAULT_DEGREE)),
         minimum=_optional_float(flat, CONF_MINIMUM),
         maximum=_optional_float(flat, CONF_MAXIMUM),
-        reject_values=flat.get(CONF_REJECT_VALUES, ()),
         precision=(int(flat[CONF_PRECISION]) if CONF_PRECISION in flat else None),
         window_duration=float(flat.get(CONF_WINDOW_DURATION, 0)),
         window_output=str(flat.get(CONF_WINDOW_OUTPUT, WINDOW_OUTPUT_MEAN)),
