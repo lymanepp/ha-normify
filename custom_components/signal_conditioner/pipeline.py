@@ -1,7 +1,7 @@
-"""Pure measurement-conditioning pipeline used by Normify.
+"""Pure measurement-conditioning pipeline used by Signal Conditioner.
 
 The pipeline intentionally implements only the production requirements exposed by
-Normify: numeric validation, configured value rejection, polynomial calibration,
+Signal Conditioner: numeric validation, configured value rejection, polynomial calibration,
 a single fixed time window, optional rounding, and diagnostics.
 """
 
@@ -19,6 +19,7 @@ from .calibration import (
     InvalidSourceValueError,
     PolynomialCalibration,
 )
+from .const import MAX_WINDOW_SECONDS
 
 
 class PipelineConfigurationError(ValueError):
@@ -42,7 +43,7 @@ class WindowOutput(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
-    """Validated configuration for one Normify pipeline."""
+    """Validated configuration for one Signal Conditioner pipeline."""
 
     calibration: PolynomialCalibration | None = None
     reject_values: tuple[float, ...] = ()
@@ -60,6 +61,10 @@ class PipelineConfig:
             raise PipelineConfigurationError("precision cannot be negative")
         if self.window_duration < 0:
             raise PipelineConfigurationError("window duration cannot be negative")
+        if self.window_duration > MAX_WINDOW_SECONDS:
+            raise PipelineConfigurationError(
+                f"window duration cannot exceed {MAX_WINDOW_SECONDS} seconds"
+            )
 
 
 @dataclass(slots=True)
@@ -139,7 +144,10 @@ class ConditioningPipeline:
 
         self._last_raw_value = raw_value
 
-        if raw_value in self.config.reject_values:
+        if any(
+            math.isclose(raw_value, rejected, rel_tol=0.0, abs_tol=1e-9)
+            for rejected in self.config.reject_values
+        ):
             return self._reject("rejected_value", raw_value=raw_value)
         if self.config.minimum is not None and raw_value < self.config.minimum:
             return self._reject("below_minimum", raw_value=raw_value)
@@ -192,7 +200,7 @@ class ConditioningPipeline:
             return None
         return self._window_started_at + timedelta(seconds=self.config.window_duration)
 
-    def next_wakeup(self, timestamp: datetime | None = None) -> datetime | None:
+    def next_wakeup(self) -> datetime | None:
         """Return the next required timer wakeup."""
         return self.window_deadline()
 
@@ -301,7 +309,7 @@ def build_pipeline_config(
     calibration: PolynomialCalibration | None = None
     if points:
         try:
-            calibration = PolynomialCalibration.fit(points, degree=degree, precision=12)
+            calibration = PolynomialCalibration.fit(points, degree=degree)
         except InvalidDataPointsError as err:
             raise PipelineConfigurationError(str(err)) from err
 

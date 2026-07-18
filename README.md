@@ -1,6 +1,6 @@
-# Normify
+# Signal Conditioner
 
-Normify replaces established Home Assistant Template, Compensation, Filter, and
+Signal Conditioner replaces established Home Assistant Template, Compensation, Filter, and
 throttle chains with one canonical sensor.
 
 ## Explicit pipeline configuration
@@ -36,12 +36,12 @@ Source state or attribute
 - Optional output-name override
 - Hide source entity
 
-Normify inherits the unit, device class, state class, and icon whenever a
+Signal Conditioner inherits the unit, device class, state class, and icon whenever a
 state-based source provides them. The config flow exposes validated overrides
 for all four values. Explicit overrides win over inherited metadata;
 attribute-based sources inherit none of the parent entity metadata unless an
 override is configured. The same fields are available when reconfiguring an
-existing Normify sensor, and clearing a field removes that override.
+existing Signal Conditioner sensor, and clearing a field removes that override.
 
 ### Custom value limits
 
@@ -80,7 +80,7 @@ Rounding is applied only to the published result.
 ## YAML example
 
 ```yaml
-normify:
+signal_conditioner:
   garage_humidity:
     source: sensor.garage_humidity_raw
 
@@ -106,9 +106,9 @@ YAML and the config flow expose the same behavior set.
 
 ## Installation
 
-Install as a custom HACS repository or copy `custom_components/normify` into the
+Install as a custom HACS repository or copy `custom_components/signal_conditioner` into the
 Home Assistant configuration directory, restart Home Assistant, and add
-**Normify** from **Settings → Devices & services → Add integration**.
+**Signal Conditioner** from **Settings → Devices & services → Add integration**.
 
 ## Development
 

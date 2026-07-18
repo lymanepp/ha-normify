@@ -1,4 +1,4 @@
-"""Tests for the Normify sensor entity."""
+"""Tests for the Signal Conditioner sensor entity."""
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -10,7 +10,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 
-from custom_components.normify.const import (
+from custom_components.signal_conditioner.const import (
     ATTR_SOURCE_VALUE,
     CONF_DATA_POINTS,
     CONF_DEGREE,

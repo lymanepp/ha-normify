@@ -1,10 +1,10 @@
-"""Unit tests for the pure Normify calibration engine."""
+"""Unit tests for the pure Signal Conditioner calibration engine."""
 
 import math
 
 import pytest
 
-from custom_components.normify.calibration import (
+from custom_components.signal_conditioner.calibration import (
     InvalidDataPointsError,
     InvalidSourceValueError,
     PolynomialCalibration,
@@ -16,9 +16,9 @@ from custom_components.normify.calibration import (
 
 def test_linear_calibration() -> None:
     """Fit and apply a linear calibration."""
-    calibration = PolynomialCalibration.fit([[1, 2], [2, 3]], degree=1, precision=2)
+    calibration = PolynomialCalibration.fit([[1, 2], [2, 3]], degree=1)
 
-    assert calibration.apply(4) == 5.0
+    assert calibration.evaluate(4) == 5.0
     assert calibration.coefficients == pytest.approx((1.0, 1.0))
 
 
@@ -42,40 +42,39 @@ def test_quadratic_calibration_with_repeated_samples() -> None:
             [100, 3.5],
             [100, 3.0],
         ],
-        degree=2,
-        precision=3,
+        degree=2
     )
 
-    assert calibration.apply(43.2) == pytest.approx(3.327)
+    assert calibration.evaluate(43.2) == pytest.approx(3.327, abs=0.001)
 
 
 def test_requires_degree_plus_one_points() -> None:
     """A polynomial requires at least degree + 1 points."""
     with pytest.raises(InvalidDataPointsError, match="at least 3 points"):
-        PolynomialCalibration.fit([[1, 2], [2, 3]], degree=2, precision=2)
+        PolynomialCalibration.fit([[1, 2], [2, 3]], degree=2)
 
 
 def test_requires_degree_plus_one_distinct_inputs() -> None:
     """Duplicate x values cannot independently define a polynomial."""
     with pytest.raises(InvalidDataPointsError, match="3 distinct input values"):
-        PolynomialCalibration.fit([[1, 2], [1, 3], [2, 4]], degree=2, precision=2)
+        PolynomialCalibration.fit([[1, 2], [1, 3], [2, 4]], degree=2)
 
 
 @pytest.mark.parametrize("bad_value", ["nan", "inf", "-inf", math.nan, math.inf])
 def test_rejects_non_finite_source_values(bad_value: object) -> None:
     """NaN and infinity must never become an HA sensor state."""
-    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1, precision=2)
+    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1)
 
     with pytest.raises(InvalidSourceValueError, match="finite"):
-        calibration.apply(bad_value)
+        calibration.evaluate(bad_value)
 
 
 def test_rejects_non_numeric_source_value() -> None:
     """Reject non-numeric source input cleanly."""
-    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1, precision=2)
+    calibration = PolynomialCalibration.fit([[0, 0], [1, 1]], degree=1)
 
     with pytest.raises(InvalidSourceValueError, match="not numeric"):
-        calibration.apply("garbage")
+        calibration.evaluate("garbage")
 
 
 def test_data_points_text_round_trip() -> None:

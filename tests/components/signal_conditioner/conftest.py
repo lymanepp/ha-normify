@@ -1,4 +1,4 @@
-"""Fixtures for Normify tests."""
+"""Fixtures for Signal Conditioner tests."""
 
 import pytest
 

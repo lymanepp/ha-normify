@@ -11,4 +11,4 @@ api:
 logger:
   default: info
   logs:
-    custom_components.normify: debug
+    custom_components.signal_conditioner: debug

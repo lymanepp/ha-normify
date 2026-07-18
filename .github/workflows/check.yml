@@ -20,6 +20,6 @@ jobs:
       - name: Ruff format
         run: ruff format --check .
       - name: Mypy
-        run: mypy custom_components/normify
+        run: mypy custom_components/signal_conditioner
       - name: Pytest
         run: pytest --cov --cov-report=term-missing --cov-report=xml

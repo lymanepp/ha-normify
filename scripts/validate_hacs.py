@@ -13,7 +13,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 HACS_JSON = ROOT / "hacs.json"
-INTEGRATION_DIR = ROOT / "custom_components" / "normify"
+INTEGRATION_DIR = ROOT / "custom_components" / "signal_conditioner"
 MANIFEST_JSON = INTEGRATION_DIR / "manifest.json"
 BRAND_ICON = ROOT / "brand" / "icon.png"
 

@@ -10,7 +10,7 @@ if [[ ! -d "${PWD}/config" ]]; then
   hass --config "${PWD}/config" --script ensure_config
 fi
 # Set the path to custom_components
-## This lets us have the structure we want <root>/custom_components/normify
+## This lets us have the structure we want <root>/custom_components/signal_conditioner
 ## while at the same time have Home Assistant configuration inside <root>/config
 ## without resorting to symlinks.
 export PYTHONPATH="${PYTHONPATH}:${PWD}/custom_components"

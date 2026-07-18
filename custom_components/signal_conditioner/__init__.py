@@ -1,4 +1,4 @@
-"""The Normify integration."""
+"""The Signal Conditioner integration."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ from .const import (
 from .pipeline import PipelineConfigurationError
 
 
-def _validate_normify(value: dict[str, Any]) -> dict[str, Any]:
+def _validate_signal_conditioner(value: dict[str, Any]) -> dict[str, Any]:
     """Validate and flatten one concise conditioning configuration."""
     if value.get(CONF_ATTRIBUTE) and value.get(CONF_HIDE_SOURCE):
         raise vol.Invalid("attribute and hide_source cannot be used together")
@@ -97,7 +97,7 @@ ROUNDING_SCHEMA = vol.Schema(
     }
 )
 
-NORMIFY_SCHEMA = vol.All(
+SIGNAL_CONDITIONER_SCHEMA = vol.All(
     vol.Schema(
         {
             vol.Required(CONF_SOURCE): cv.entity_id,
@@ -118,11 +118,11 @@ NORMIFY_SCHEMA = vol.All(
             vol.Optional(CONF_ROUNDING): ROUNDING_SCHEMA,
         }
     ),
-    _validate_normify,
+    _validate_signal_conditioner,
 )
 
 CONFIG_SCHEMA = vol.Schema(
-    {DOMAIN: vol.Schema({cv.slug: NORMIFY_SCHEMA})}, extra=vol.ALLOW_EXTRA
+    {DOMAIN: vol.Schema({cv.slug: SIGNAL_CONDITIONER_SCHEMA})}, extra=vol.ALLOW_EXTRA
 )
 
 
@@ -143,17 +143,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Normify from a config entry."""
+    """Set up Signal Conditioner from a config entry."""
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a Normify config entry."""
+    """Unload a Signal Conditioner config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload Normify when its config entry changes."""
+    """Reload Signal Conditioner when its config entry changes."""
     await hass.config_entries.async_reload(entry.entry_id)

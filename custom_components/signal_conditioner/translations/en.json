@@ -1,9 +1,9 @@
 {
-  "title": "Normify",
+  "title": "Signal Conditioner",
   "config": {
     "step": {
       "user": {
-        "title": "Create a Normified sensor",
+        "title": "Create a conditioned sensor",
         "description": "Choose the source and explicitly select only the conditioning behaviors to include.",
         "data": {
           "source": "Source sensor",
@@ -26,7 +26,7 @@
         }
       },
       "reconfigure": {
-        "title": "Reconfigure Normify",
+        "title": "Reconfigure Signal Conditioner",
         "description": "Choose the source and explicitly select only the conditioning behaviors to include.",
         "data": {
           "source": "Source sensor",
@@ -93,9 +93,9 @@
       "invalid_configuration": "The selected behavior configuration is invalid."
     },
     "abort": {
-      "already_configured": "This Normify helper is already configured.",
+      "already_configured": "This Signal Conditioner helper is already configured.",
       "invalid_import": "The YAML conditioning configuration is invalid.",
-      "reconfigure_successful": "The Normify helper was reconfigured successfully."
+      "reconfigure_successful": "The Signal Conditioner helper was reconfigured successfully."
     }
   },
   "selector": {

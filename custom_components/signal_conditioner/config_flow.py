@@ -1,4 +1,4 @@
-"""Config flow for Normify."""
+"""Config flow for Signal Conditioner."""
 
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
 )
-from homeassistant.util import slugify
 
 from .calibration import (
     InvalidDataPointsError,
@@ -137,6 +136,13 @@ def _behavior_defaults(defaults: Mapping[str, Any]) -> dict[str, bool]:
     return {key: bool(defaults.get(key, value)) for key, value in inferred.items()}
 
 
+def _source_unique_id(data: Mapping[str, Any]) -> str:
+    """Return the stable identity of one configured source signal."""
+    source = str(data[CONF_SOURCE])
+    attribute = str(data.get(CONF_ATTRIBUTE, "")).strip()
+    return f"{source}::{attribute}" if attribute else source
+
+
 def _source_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     toggles = _behavior_defaults(defaults)
     return vol.Schema(
@@ -156,13 +162,19 @@ def _source_schema(defaults: Mapping[str, Any]) -> vol.Schema:
             _suggested_optional(CONF_UNIT_OF_MEASUREMENT, defaults): TextSelector(),
             _suggested_optional(CONF_DEVICE_CLASS, defaults): SelectSelector(
                 SelectSelectorConfig(
-                    options=[device_class.value for device_class in SensorDeviceClass],
+                    options=[
+                        "",
+                        *(device_class.value for device_class in SensorDeviceClass),
+                    ],
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
             _suggested_optional(CONF_STATE_CLASS, defaults): SelectSelector(
                 SelectSelectorConfig(
-                    options=[state_class.value for state_class in SensorStateClass],
+                    options=[
+                        "",
+                        *(state_class.value for state_class in SensorStateClass),
+                    ],
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
@@ -327,7 +339,7 @@ def _normalize_rounding(user_input: Mapping[str, Any]) -> dict[str, Any]:
     return {CONF_PRECISION: int(user_input.get(CONF_PRECISION, DEFAULT_PRECISION))}
 
 
-class NormifyConfigFlow(ConfigFlow, domain=DOMAIN):
+class SignalConditionerConfigFlow(ConfigFlow, domain=DOMAIN):
     """Configure only the conditioning behaviors explicitly selected by the user."""
 
     VERSION = 1
@@ -480,7 +492,7 @@ class NormifyConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_update_reload_and_abort(
                 self._reconfigure_entry, title=data[CONF_NAME], data=data
             )
-        unique_id = slugify(data[CONF_NAME])
+        unique_id = _source_unique_id(data)
         await self.async_set_unique_id(unique_id)
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title=data[CONF_NAME], data=data)

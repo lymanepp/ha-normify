@@ -1,5 +1,5 @@
 {
-  "name": "lymanepp/ha-normify",
+  "name": "lymanepp/ha-signal-conditioner",
   "image": "mcr.microsoft.com/devcontainers/base:debian",
   "postCreateCommand": "scripts/setup",
   "forwardPorts": [

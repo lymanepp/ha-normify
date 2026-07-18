@@ -1,4 +1,4 @@
-"""Pure calibration logic used by Normify.
+"""Pure calibration logic used by Signal Conditioner.
 
 This module deliberately has no Home Assistant dependencies.  It can be tested
 and evolved independently from entity lifecycle and config-flow code.
@@ -93,7 +93,6 @@ class PolynomialCalibration:
     """A fitted polynomial calibration that transforms raw numeric values."""
 
     degree: int
-    precision: int
     data_points: tuple[tuple[float, float], ...]
     coefficients: tuple[float, ...]
     _polynomial: Polynomial
@@ -104,14 +103,10 @@ class PolynomialCalibration:
         data_points: Iterable[Sequence[object]],
         *,
         degree: int,
-        precision: int,
     ) -> PolynomialCalibration:
         """Fit a polynomial calibration to point pairs."""
         if degree < 1:
             raise InvalidDataPointsError("degree must be at least 1")
-        if precision < 0:
-            raise InvalidDataPointsError("precision cannot be negative")
-
         normalized = normalize_data_points(data_points)
         minimum_points = degree + 1
         if len(normalized) < minimum_points:
@@ -145,7 +140,6 @@ class PolynomialCalibration:
 
         return cls(
             degree=degree,
-            precision=precision,
             data_points=normalized,
             coefficients=coefficients,
             _polynomial=polynomial,
@@ -159,6 +153,3 @@ class PolynomialCalibration:
             raise InvalidSourceValueError("calibrated value must be finite")
         return result
 
-    def apply(self, source_value: object) -> float:
-        """Transform one source value and round it to configured precision."""
-        return round(self.evaluate(source_value), self.precision)

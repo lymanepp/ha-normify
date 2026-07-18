@@ -1,14 +1,16 @@
-"""Unit tests for the pure Normify conditioning pipeline."""
+"""Unit tests for the pure Signal Conditioner conditioning pipeline."""
 
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.normify.calibration import PolynomialCalibration
-from custom_components.normify.pipeline import (
+from custom_components.signal_conditioner.calibration import PolynomialCalibration
+from custom_components.signal_conditioner.const import MAX_WINDOW_SECONDS
+from custom_components.signal_conditioner.pipeline import (
     ConditioningPipeline,
     Disposition,
     PipelineConfig,
+    PipelineConfigurationError,
     WindowOutput,
 )
 
@@ -29,7 +31,7 @@ def test_rejects_sentinels_and_out_of_range_values() -> None:
 
 def test_applies_calibration_before_rounding() -> None:
     """Calibration runs before optional final rounding."""
-    calibration = PolynomialCalibration.fit([[0, 0], [10, 20]], degree=1, precision=12)
+    calibration = PolynomialCalibration.fit([[0, 0], [10, 20]], degree=1)
     pipeline = ConditioningPipeline(
         PipelineConfig(calibration=calibration, precision=2)
     )
@@ -143,3 +145,17 @@ def test_default_window_output_is_mean() -> None:
     pipeline.process(4, NOW + timedelta(seconds=5))
 
     assert pipeline.flush(NOW + timedelta(seconds=10)).value == 3
+
+
+def test_reject_values_allow_only_float_representation_noise() -> None:
+    """Sentinel matching tolerates tiny conversion noise without becoming broad."""
+    pipeline = ConditioningPipeline(PipelineConfig(reject_values=(12.3456789,)))
+
+    assert pipeline.process(12.3456789005, NOW).disposition is Disposition.REJECT
+    assert pipeline.process(12.34568, NOW).disposition is Disposition.PUBLISH
+
+
+def test_pipeline_config_enforces_maximum_window_duration() -> None:
+    """The pure pipeline enforces the same maximum as YAML and the UI."""
+    with pytest.raises(PipelineConfigurationError, match="cannot exceed"):
+        PipelineConfig(window_duration=MAX_WINDOW_SECONDS + 1)

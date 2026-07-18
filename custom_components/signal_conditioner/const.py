@@ -1,8 +1,8 @@
-"""Constants for the Normify integration."""
+"""Constants for the Signal Conditioner integration."""
 
 from homeassistant.const import Platform
 
-DOMAIN = "normify"
+DOMAIN = "signal_conditioner"
 PLATFORMS = [Platform.SENSOR]
 
 CONF_DATA_POINTS = "data_points"

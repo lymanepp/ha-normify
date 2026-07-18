@@ -1,4 +1,4 @@
-"""Tests for the Normify config flow."""
+"""Tests for the Signal Conditioner config flow."""
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
@@ -12,7 +12,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.normify.const import (
+from custom_components.signal_conditioner.const import (
     CONF_DATA_POINTS,
     CONF_DATA_POINTS_TEXT,
     CONF_DEGREE,
@@ -264,3 +264,32 @@ async def test_reconfigure_can_change_and_clear_metadata_overrides(
     assert entry.data[CONF_UNIT_OF_MEASUREMENT] == "°C"
     for key in (CONF_DEVICE_CLASS, CONF_STATE_CLASS, CONF_ICON):
         assert key not in entry.data
+
+
+async def test_user_entries_are_unique_by_source_not_display_name(
+    hass: HomeAssistant,
+) -> None:
+    """Two different source signals may intentionally share a display name."""
+    for entity_id in ("sensor.first_raw", "sensor.second_raw"):
+        hass.states.async_set(entity_id, "1", {"friendly_name": "Shared Raw"})
+
+    for entity_id in ("sensor.first_raw", "sensor.second_raw"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_NAME: "Shared",
+                CONF_SOURCE: entity_id,
+                "attribute": "",
+                CONF_HIDE_SOURCE: False,
+                CONF_ENABLE_LIMITS: False,
+                CONF_ENABLE_CALIBRATION: False,
+                CONF_ENABLE_WINDOW: False,
+                CONF_ENABLE_ROUNDING: False,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert result["result"].unique_id == entity_id

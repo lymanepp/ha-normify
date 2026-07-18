@@ -1,11 +1,11 @@
-"""Tests for Normify diagnostics."""
+"""Tests for Signal Conditioner diagnostics."""
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, CONF_SOURCE
 from homeassistant.core import HomeAssistant
 
-from custom_components.normify.const import CONF_DATA_POINTS, DOMAIN
-from custom_components.normify.diagnostics import async_get_config_entry_diagnostics
+from custom_components.signal_conditioner.const import CONF_DATA_POINTS, DOMAIN
+from custom_components.signal_conditioner.diagnostics import async_get_config_entry_diagnostics
 
 
 async def test_config_entry_diagnostics(hass: HomeAssistant) -> None:

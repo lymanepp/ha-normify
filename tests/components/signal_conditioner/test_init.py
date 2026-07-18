@@ -1,11 +1,11 @@
-"""Tests for Normify setup and YAML validation."""
+"""Tests for Signal Conditioner setup and YAML validation."""
 
 import pytest
 import voluptuous as vol
 from homeassistant.const import CONF_SOURCE
 
-from custom_components.normify import CONFIG_SCHEMA
-from custom_components.normify.const import (
+from custom_components.signal_conditioner import CONFIG_SCHEMA
+from custom_components.signal_conditioner.const import (
     CONF_CALIBRATION,
     CONF_DATA_POINTS,
     CONF_DEGREE,

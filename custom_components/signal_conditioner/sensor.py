@@ -1,4 +1,4 @@
-"""Sensor platform for Normify."""
+"""Sensor platform for Signal Conditioner."""
 
 from __future__ import annotations
 
@@ -66,19 +66,19 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up a Normify sensor from a config entry."""
-    sensor = NormifySensor(hass, entry)
+    """Set up a Signal Conditioner sensor from a config entry."""
+    sensor = SignalConditionerSensor(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = sensor
     async_add_entities([sensor])
 
 
-class NormifySensor(SensorEntity):
+class SignalConditionerSensor(SensorEntity):
     """One canonical sensor backed by an in-memory conditioning pipeline."""
 
     _attr_should_poll = False
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Initialize the Normify sensor."""
+        """Initialize the Signal Conditioner sensor."""
         config = entry.data
         self._entry_id = entry.entry_id
         self._source_entity_id = config[CONF_SOURCE]
@@ -88,7 +88,7 @@ class NormifySensor(SensorEntity):
         self._conditioned_value: float | None = None
         self._cancel_timer: Callable[[], None] | None = None
 
-        self._attr_unique_id = f"normify.{entry.unique_id or entry.entry_id}"
+        self._attr_unique_id = f"signal_conditioner.{entry.unique_id or entry.entry_id}"
         self._attr_name = config[CONF_NAME]
         self._attr_native_unit_of_measurement = config.get(CONF_UNIT_OF_MEASUREMENT)
         self._attr_device_class = cast(
@@ -199,7 +199,7 @@ class NormifySensor(SensorEntity):
                 self.async_write_ha_state()
         else:
             _LOGGER.debug(
-                "Normify rejected %s from %s: %s",
+                "Signal Conditioner rejected %s from %s: %s",
                 raw_value,
                 self._source_entity_id,
                 result.reason,
@@ -245,7 +245,7 @@ class NormifySensor(SensorEntity):
         now = dt_util.utcnow()
         deadlines = [
             deadline
-            for deadline in (next_wakeup, self._pipeline.next_wakeup(now))
+            for deadline in (next_wakeup, self._pipeline.next_wakeup())
             if deadline is not None
         ]
         if not deadlines:

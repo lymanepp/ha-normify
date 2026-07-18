@@ -1,4 +1,4 @@
-"""Diagnostics support for Normify."""
+"""Diagnostics support for Signal Conditioner."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .sensor import NormifySensor
+from .sensor import SignalConditionerSensor
 
 
 async def async_get_config_entry_diagnostics(
@@ -27,7 +27,7 @@ async def async_get_config_entry_diagnostics(
     }
 
     sensor = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if isinstance(sensor, NormifySensor):
+    if isinstance(sensor, SignalConditionerSensor):
         diagnostics["pipeline"] = asdict(sensor.pipeline.snapshot())
 
     return diagnostics

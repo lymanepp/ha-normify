@@ -6,5 +6,5 @@ cd "$(dirname "$0")"
 
 ruff check . --fix
 ruff format .
-mypy custom_components/normify
+mypy custom_components/signal_conditioner
 pytest
